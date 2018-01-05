@@ -58,11 +58,11 @@ class DCOSMonitorCLI(click.MultiCommand):
 @click.command(cls=DCOSMonitorCLI, context_settings=CONTEXT_SETTINGS)
 @click.option('--master', default='localhost',
               help='Changes the DC/OS master')
-@click.option('--slave_data_file', type=click.File('rb'),
+@click.option('--slave_data_file',
               help='use data file for slave data instead of mesos.master')
 @click.option('--ignore_slave_data', is_flag=True, default=False,
               help='do not attempt to load slave data (may prevent subcmds from working)')
-@click.option('--state_data_file', type=click.File('rb'),
+@click.option('--state_data_file',
               help='use data file for state data instead of mesos.master')
 @click.option('--ignore_state_data', is_flag=True, default=False,
               help='do not attempt to load state data (may prevent subcmds from working)')
@@ -95,7 +95,7 @@ def cli(ctx, master, slave_data_file, ignore_slave_data, state_data_file, ignore
 
     # are we loading state data from a file or from a running cluster?
     if ctx.state_data_file is not None:
-        ctx.state_data = load_state_data_from_file()
+        ctx.state_data = load_state_data_from_file(ctx.state_data_file)
     else:
         ctx.state_data = get_state_data(ctx, ctx.master)
 
