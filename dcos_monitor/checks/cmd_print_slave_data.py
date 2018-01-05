@@ -5,7 +5,7 @@ from dcos_monitor.cli import pass_context
 # formatting constants
 SLAVE_STRING = "  {hostname:<20} {agent_id:<40}"
 
-@click.command('print_slave_data', short_help='Prints out the slave data')
+@click.command('print_slave_data', short_help='Print the slave data json')
 @click.option('--list_slaves', is_flag=True,
         help='list out the slave IDs with some metadata')
 @click.option('--slave_id', default=None,
