@@ -48,7 +48,7 @@ class DCOSMonitorCLI(click.MultiCommand):
         try:
             if sys.version_info[0] == 2:
                 name = name.encode('ascii', 'replace')
-            mod = __import__('dcos_monitor.checks.cmd_' + name,
+            mod = __import__('dcos_monitor.cmds.cmd_' + name,
                              None, None, ['cli'])
         except ImportError:
             return
