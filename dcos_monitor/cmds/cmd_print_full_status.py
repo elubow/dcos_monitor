@@ -1,8 +1,10 @@
 import click
 import copy
 import json
+import socket
 import time
 from dcos_monitor.cli import get_json, pass_context
+from dcos_monitor.util import dget, lpad, print_separator
 
 #
 # Formatting constants
@@ -24,8 +26,10 @@ FRAMEWORK_STRING = "{id:<51} [{name:^26}]"
 
 
 @click.command('print_full_status', short_help='Print out a full status report of the cluster')
+@click.option('--wait', type=click.INT, default=5,
+                help='time to wait for agent response')
 @pass_context
-def cli(ctx):
+def cli(ctx, wait):
     """print out a full status report on the cluster
     """
     print_cluster_stats(ctx.slave_data)
@@ -36,32 +40,13 @@ def cli(ctx):
     print("")
     GET_CONTAINER_STATS = False
     RESERVATION_BREAKDOWN = False
-    WAIT = 5 # XXX wtf does this do?
-    print_agent_info(ctx.slave_data['slaves'], GET_CONTAINER_STATS, RESERVATION_BREAKDOWN, wait=WAIT)
+    print_agent_info(ctx.slave_data['slaves'], GET_CONTAINER_STATS, RESERVATION_BREAKDOWN, wait=wait)
 
     print_separator()
     print("Minuteman Stats")
     print_separator()
     print("")
     print_minuteman(ctx.state_data)
-
-def lpad(str, int = 4):
-    print("{}{}".format(" "*int, str))
-
-def dget(item, ks, default):
-    if len(ks) == 1:
-        if ks[0] in item:
-            return item[ks[0]]
-        else:
-            return default
-    else:
-        if ks[0] in item and item[ks[0]] is not None:
-            return dget(item[ks[0]],ks[1:],default)
-        else:
-            return default
-
-def print_separator(length = 80, k = '=', spaces = 0):
-    print(" " * spaces + k * length)
 
 #### Need to refactor to pull out calculations from prints
 #### Also need to refactor to rearrange function
@@ -268,6 +253,27 @@ def print_agent_info(slaves, get_container_stats, get_reservation_breakdown, wai
                                             data_end[hostname][executor]['statistics'])
                     print_container_stats(executor, stats, single_data_point = True)
         print("")
+
+def calculate_container_stats(start, end):
+    stats = {}
+
+    timestamp_delta = end['timestamp'] - start['timestamp']
+
+    # print(end)
+    stats['memory_allocated'] = end['mem_limit_bytes']
+    stats['memory_used'] = end['mem_rss_bytes']
+    stats['memory_utilization'] = 100.0 * end['mem_rss_bytes'] / end['mem_limit_bytes']
+
+    cpus_time_delta = (end['cpus_system_time_secs'] + end['cpus_user_time_secs']
+                       - start['cpus_system_time_secs'] - start['cpus_user_time_secs'])
+    if(abs(cpus_time_delta) < 1e-12) or timestamp_delta == 0:
+        cpus_time_delta = 0
+        timestamp_delta = 1
+    stats['cpus_used'] = float(cpus_time_delta / timestamp_delta)
+    stats['cpus_allocated'] = end['cpus_limit']
+    stats['cpus_utilization'] = 100 * stats['cpus_used'] / stats['cpus_allocated']
+
+    return stats
 
 def print_slave_reservations(slave, get_reservation_breakdown):
     reserved_resources_full = slave['reserved_resources_full']
@@ -489,5 +495,4 @@ def get_entry_matching(entries, key, value):
             # print("{}!={}".format(entry[key],value))
             pass
     return None
-
 

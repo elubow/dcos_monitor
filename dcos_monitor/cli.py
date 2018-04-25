@@ -3,34 +3,24 @@ DCOS monitoring and introspection commands.
 
 NOTE Adapted from a status script written by Justin Lee.
 """
+import logging
 import os
 import sys
 import click
+import click_log
 
 
 CONTEXT_SETTINGS = dict(auto_envvar_prefix='DCOSMON')
+logger = logging.getLogger(__name__)
+click_log.basic_config(logger)
 
 class Context(object):
 
     def __init__(self):
-        self.verbose = False
-        self.master = ""
-
-    def log(self, msg, *args):
-        """Logs a message to stderr."""
-        if args:
-            msg %= args
-        click.echo(msg, file=sys.stderr)
-
-    def vlog(self, msg, *args):
-        """Logs a message to stderr only if verbose is enabled."""
-        if self.verbose:
-            self.log(msg, *args)
-
+        self.log = logger
 
 pass_context = click.make_pass_decorator(Context, ensure=True)
-cmd_folder = os.path.abspath(os.path.join(os.path.dirname(__file__),
-                                          'checks'))
+cmd_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), 'cmds'))
 
 
 class DCOSMonitorCLI(click.MultiCommand):
@@ -57,19 +47,20 @@ class DCOSMonitorCLI(click.MultiCommand):
 
 @click.command(cls=DCOSMonitorCLI, context_settings=CONTEXT_SETTINGS)
 @click.option('--master', default='localhost',
-              help='Changes the DC/OS master')
-@click.option('--slave_data_file',
+              help='hostname of the DC/OS master')
+@click.option('--token',
+              help='dcos authentication token')
+@click.option('--slave_data_file', type=click.Path(exists=True),
               help='use data file for slave data instead of mesos.master')
 @click.option('--ignore_slave_data', is_flag=True, default=False,
               help='do not attempt to load slave data (may prevent subcmds from working)')
-@click.option('--state_data_file',
+@click.option('--state_data_file', type=click.Path(exists=True),
               help='use data file for state data instead of mesos.master')
 @click.option('--ignore_state_data', is_flag=True, default=False,
               help='do not attempt to load state data (may prevent subcmds from working)')
-@click.option('-v', '--verbose', is_flag=True,
-              help='Enables verbose mode')
+@click_log.simple_verbosity_option(logger)
 @pass_context
-def cli(ctx, master, slave_data_file, ignore_slave_data, state_data_file, ignore_state_data, verbose):
+def cli(ctx, master, token, slave_data_file, ignore_slave_data, state_data_file, ignore_state_data):
     """A command line interface to getting and munging data from a DC/OS cluster.
     This command must have access to the master node on port 5050. The easiest
     way to accomplish this is to setup an SSH tunnel to the master if you
@@ -80,25 +71,33 @@ def cli(ctx, master, slave_data_file, ignore_slave_data, state_data_file, ignore
         ssh -A -L 5050:<int master ip>:5050 core@<ext master ip>
         ssh -A -L 5050:10.0.6.89:5050 core@54.191.211.256
     """
+    ctx.log.debug("starting global option processing")
     ctx.master = master
+    ctx.token = token
     ctx.slave_data_file = slave_data_file
     ctx.ignore_slave_data = ignore_slave_data
     ctx.state_data_file = state_data_file
     ctx.ignore_state_data = ignore_state_data
-    ctx.verbose = verbose
 
     # are we loading slave data from a file or from a running cluster?
-    if ctx.slave_data_file is not None:
+    if ctx.ignore_slave_data:
+        ctx.log.debug("skipping slave data...")
+    elif ctx.slave_data_file is not None:
+        ctx.log.debug("loading slave data from file {0}".format(ctx.slave_data_file))
         ctx.slave_data = load_slave_data_from_file(ctx.slave_data_file)
     else:
         ctx.slave_data = get_slave_data(ctx, ctx.master)
 
     # are we loading state data from a file or from a running cluster?
-    if ctx.state_data_file is not None:
+    if ctx.ignore_state_data:
+        ctx.log.debug("skipping state data...")
+    elif ctx.state_data_file is not None:
+        ctx.log.debug("loading state data from file {0}".format(ctx.state_data_file))
         ctx.state_data = load_state_data_from_file(ctx.state_data_file)
     else:
         ctx.state_data = get_state_data(ctx, ctx.master)
 
+    ctx.log.debug("global option processing complete")
 
 def load_slave_data_from_file(slave_data_file):
     with open(slave_data_file) as json_file:  
@@ -136,14 +135,12 @@ def get_auth_token(hostname, username, password):
     token = response['token'] if 'token' in response else None
     return token
 
-def login(hostname = None):
+def login(hostname, username, password):
     if hostname is None:
         hostname = socket.gethostname()
     token = None
     try:
         while not token:
-            username = input("Username: ")
-            password = getpass.getpass("Password: ")
             token =  get_auth_token(hostname, username, password)
     except KeyboardInterrupt:
         exit(1)
@@ -164,7 +161,7 @@ def get_slaves(hostname = None):
 
     return get_json(slaves_url)
 
-def get_state_json(hostname = None):
+def get_state_json(hostname=None):
     if hostname is None:
         hostname = socket.gethostname()
     port = 5050
@@ -191,9 +188,9 @@ def get_state_data(ctx, master):
         state_data = get_state_json(master)
     except requests.exceptions.ConnectionError:
         if master is None:
-            ctx.log("ConnectionError: Nothing listening on port 5050")
+            ctx.log.error("ConnectionError: Nothing listening on port 5050")
         else:
-            ctx.log("ConnectionError: Unable to connect to {0}:5050".format(master))
+            ctx.log.error("ConnectionError: Unable to connect to {0}:5050".format(master))
         exit(1)
 
     return state_data
@@ -203,9 +200,19 @@ def get_slave_data(ctx, master):
         slave_data = get_slaves(master)
     except requests.exceptions.ConnectionError:
         if master is None:
-            ctx.log("ConnectionError: Nothing listening on port 5050")
+            ctx.logging.error("ConnectionError: Nothing listening on port 5050")
         else:
-            ctx.log("ConnectionError: Unable to connect to {0}:5050".format(master))
+            ctx.logging.error("ConnectionError: Unable to connect to {0}:5050".format(master))
         exit(1)
 
     return slave_data
+
+def login(hostname, username, password):
+    if hostname is None:
+        hostname = socket.gethostname()
+    token = None
+    try:
+        token = get_auth_token(hostname, username, password)
+    except:
+        return None
+    return token
