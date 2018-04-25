@@ -20,6 +20,9 @@ session.trust_env = False
 def cli(ctx, marathon_user, marathon_password):
     """print out a full status of marathon
     """
+    ctx.log.error("SORRY this doesn't work at the moment. exiting...")
+    return
+
     GET_MARATHON = True
     SHOW_INACTIVE = False
     if ctx.token == None:
