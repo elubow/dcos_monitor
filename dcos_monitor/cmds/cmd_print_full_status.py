@@ -26,10 +26,14 @@ FRAMEWORK_STRING = "{id:<51} [{name:^26}]"
 
 
 @click.command('print_full_status', short_help='Print out a full status report of the cluster')
+@click.option('--reservation-breakdown/--no-reservation-breakdown', default=True,
+                help='more granular reservation stats')
+@click.option('--container-stats/--no-container-stats', default=False,
+                help='show container level statistics (need to have access to /monitor/statistics.json for this)')
 @click.option('--wait', type=click.INT, default=5,
                 help='time to wait for agent response')
 @pass_context
-def cli(ctx, wait):
+def cli(ctx, reservation_breakdown, container_stats, wait):
     """print out a full status report on the cluster
     """
     print_cluster_stats(ctx.slave_data)
@@ -38,9 +42,7 @@ def cli(ctx, wait):
     print("Agent Stats")
     print_separator()
     print("")
-    GET_CONTAINER_STATS = False
-    RESERVATION_BREAKDOWN = False
-    print_agent_info(ctx.slave_data['slaves'], GET_CONTAINER_STATS, RESERVATION_BREAKDOWN, wait=wait)
+    print_agent_info(ctx.slave_data['slaves'], container_stats, reservation_breakdown, wait=wait)
 
     print_separator()
     print("Minuteman Stats")
