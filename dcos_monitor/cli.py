@@ -68,8 +68,8 @@ def cli(ctx, master, token, slave_data_file, ignore_slave_data, state_data_file,
     additional documentation on subcommand usage. If you intend to use an SSH
     proxy, the command would look as follows:
 
-        ssh -A -L 5050:<int master ip>:5050 core@<ext master ip>
-        ssh -A -L 5050:10.0.6.89:5050 core@54.191.211.256
+            ssh -A -L 5050:<int master ip>:5050 core@<ext master ip>
+            ssh -A -L 5050:10.0.6.89:5050 core@54.191.211.256
     """
     ctx.log.debug("starting global option processing")
     ctx.master = master
