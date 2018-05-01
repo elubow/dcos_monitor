@@ -18,4 +18,3 @@ def dget(item, ks, default):
 
 def print_separator(length = 80, k = '=', spaces = 0):
     print(" " * spaces + k * length)
-

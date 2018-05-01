@@ -26,21 +26,27 @@ FRAMEWORK_STRING = "{id:<51} [{name:^26}]"
 
 
 @click.command('print_full_status', short_help='Print out a full status report of the cluster')
+@click.option('--cluster-stats/--no-cluster-stats', default=True,
+                help='show the total cluster stats')
+@click.option('--reservation-breakdown/--no-reservation-breakdown', default=True,
+                help='more granular reservation stats')
+@click.option('--container-stats/--no-container-stats', default=False,
+                help='show container level statistics (need to have access to /monitor/statistics.json for this)')
 @click.option('--wait', type=click.INT, default=5,
                 help='time to wait for agent response')
 @pass_context
-def cli(ctx, wait):
+def cli(ctx, cluster_stats, reservation_breakdown, container_stats, wait):
     """print out a full status report on the cluster
     """
-    print_cluster_stats(ctx.slave_data)
+    cluster_allocated, cluster_percentage, cluster_total = gather_cluster_stats(ctx.slave_data)
+    if cluster_stats:
+        print_cluster_stats(cluster_allocated, cluster_percentage, cluster_total)
 
     print_separator()
     print("Agent Stats")
     print_separator()
     print("")
-    GET_CONTAINER_STATS = False
-    RESERVATION_BREAKDOWN = False
-    print_agent_info(ctx.slave_data['slaves'], GET_CONTAINER_STATS, RESERVATION_BREAKDOWN, wait=wait)
+    print_agent_info(ctx.slave_data['slaves'], container_stats, reservation_breakdown, wait=wait)
 
     print_separator()
     print("Minuteman Stats")
@@ -85,23 +91,27 @@ def print_stats(allocated, total, percentage):
         
     print("")
 
-# Collect information (totals) about a cluster from a 'slaves' block (and display it)
-def print_cluster_stats(slaves):
+# Collect information (totals) about a cluster from a 'slaves' block
+def gather_cluster_stats(slaves):
     resources = ['mem', 'cpus', 'gpus', 'disk']
 
-    total = {}
     allocated = {}
     percentage = {}
+    total = {}
     for resource in resources:
         total[resource] = sum([slave['resources'][resource] for slave in slaves['slaves']])
         allocated[resource] = sum([slave['used_resources'][resource] for slave in slaves['slaves']])
         percentage[resource] = 0 if total[resource] == 0 else 100 * allocated[resource] / total[resource]
+    return allocated, percentage, total
 
+# Display information about a cluster gathered by gather_cluster_stats
+def print_cluster_stats(allocated, percentage, total):
     print_separator()
     print("Cluster:")
     print_separator()
 
     print_stats(allocated, total, percentage)
+
 
 # Rerrange stats about a slave from a 'slaves' block (and display it).
 def print_slave_stats(slave):
