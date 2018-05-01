@@ -1,14 +1,22 @@
+from os import path
 from setuptools import setup
+
+here = path.abspath(path.dirname(__file__))
+
+# Get the long description from the README file
+with open(path.join(here, 'README.md'), encoding='utf-8') as f:
+    long_description = f.read()
 
 setup(
     name='dcos-monitor',
-    version='0.2',
+    version='0.2.0',
     description='a dcos introspection tool',
+    long_description=long_description,
     url='https://github.com/elubow/dcos_monitor',
     author='Eric Lubow',
     author_email='eric@lubow.org',
     packages=['dcos_monitor', 'dcos_monitor.cmds'],
-    keywords=['dcos', 'mesos'],
+    keywords='dcos mesos',
     include_package_data=True,
     install_requires=[
         'click',
